@@ -1,0 +1,130 @@
+module XmlDocument
+
+from "wasi/file" include File
+from "list" include List
+from "map" include Map
+from "buffer" include Buffer
+from "array" include Array
+from "string" include String
+
+use Map.*
+
+provide record XmlAttribute {
+    name: String,
+    value: String
+}
+
+provide record rec XmlNode {
+    mut parent: Option<XmlNode>,
+    mut name: String,
+    mut attributes: Array<XmlAttribute>,
+    mut children: Array<XmlNode>,
+    mut innerText: String
+}
+
+provide record XmlDocument {
+    version: String,
+    language: String,
+    rootNode: XmlNode
+}
+
+let getIndentation = (indentation) => {
+    let arr = Array.make(indentation * 3, ' ')
+
+    String.implode(arr)
+}
+
+let attributeToString = (attribute: XmlAttribute) => {
+    attribute.name ++ "='" ++ attribute.value ++ "'"
+}
+
+let attributesToString = (attributes: Array<XmlAttribute>) => {
+    let buffer = Buffer.make(42)
+
+    Array.forEach(attr => {
+        Buffer.addString(attributeToString(attr), buffer)
+    }, attributes)
+
+    Buffer.toString(buffer)
+}
+
+let rec nodeToString = (node: XmlNode, buffer, indentLevel = 0) => {
+    let indentation = getIndentation(indentLevel)
+
+    Buffer.addString(indentation ++ "<" ++ node.name, buffer)
+
+    if(Array.length(node.attributes) > 0) {
+        Buffer.addString(" ", buffer)
+    }
+
+    Buffer.addString(attributesToString(node.attributes) ++ ">", buffer)
+
+    if(node.innerText == "") {
+        Buffer.addString("\n", buffer)
+
+        Array.forEach(n => {
+            nodeToString(n, buffer, indentLevel=indentLevel + 1)
+        }, node.children)
+
+        Buffer.addString(indentation, buffer)
+    }
+    else {
+        Buffer.addString(node.innerText, buffer)
+    }
+    
+
+    Buffer.addString("</" ++ node.name ++ ">\n", buffer)
+}
+
+provide let toString = (document: XmlDocument) => {
+    let buffer = Buffer.make(42)
+
+    Buffer.addString("<?xml version='" ++ document.version ++ "' lang='" ++ document.language ++ "' ?>\n", buffer)
+    nodeToString(document.rootNode, buffer)
+
+    Buffer.toString(buffer)   
+}
+
+provide let createElement = (name, parent=None) => {
+    let attributes = [>]
+    let children = [>]
+
+    {
+        parent: parent, 
+        name: name, 
+        attributes: attributes, 
+        children: children, 
+        innerText: ""
+    }
+}
+
+provide let addAttribute = (name, value, node) => {
+    let attribute = {
+        name: name,
+        value: value
+    }
+
+    node.attributes = Array.append(node.attributes, [> attribute])
+}
+
+let appendChild = (child, parent) => {
+    child.parent = Some(parent)
+
+    parent.children = Array.append(parent.children, [> child])
+}
+
+provide let fromString = content => {
+    let rootNode = createElement("root")
+    let childNode = createElement("child")
+    
+    addAttribute("option", "1", rootNode)
+    appendChild(childNode, rootNode)
+
+    childNode.innerText = "Hello World"
+    
+    Ok({
+        rootNode: rootNode,
+        language: "en",
+        version: "1.0"
+    })
+}

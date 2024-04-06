@@ -1,0 +1,11 @@
+module Main
+
+from "./xmlDocument.gr" include XmlDocument
+
+let xml = "<?xml version='' lang='en' ?><root><child attribute='value'>hello world</child></root>"
+let doc = XmlDocument.fromString(xml)
+
+match(doc) {
+    Ok(doc) => print(XmlDocument.toString(doc)),
+    Err(message) => print(message)
+}
